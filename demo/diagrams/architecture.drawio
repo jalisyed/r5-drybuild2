@@ -1,0 +1,25 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Architecture">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="400" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="src" value="Sources (assumed)&#10;POS daily export&#10;Weekly inventory&#10;Loyalty file&#10;Promotions calendar" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDEFF2;strokeColor=#1D425C;" vertex="1" parent="1">
+          <mxGeometry x="40" y="120" width="180" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="land" value="Land &amp; clean&#10;Bronze -&gt; Silver&#10;quarantine, dedupe" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#1D425C;" vertex="1" parent="1">
+          <mxGeometry x="280" y="120" width="180" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="gold" value="Business-ready&#10;7 gold tables" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#1D425C;" vertex="1" parent="1">
+          <mxGeometry x="520" y="120" width="180" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="use" value="What you use&#10;AI/BI dashboard (5 pages)&#10;Genie space, Streamlit app" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#1D425C;" vertex="1" parent="1">
+          <mxGeometry x="760" y="120" width="220" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="src" target="land"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="land" target="gold"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="gold" target="use"><mxGeometry relative="1" as="geometry" /></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

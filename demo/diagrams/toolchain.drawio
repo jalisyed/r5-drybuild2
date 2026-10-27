@@ -1,0 +1,28 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Toolchain">
+    <mxGraphModel dx="800" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="cc" value="Claude Code&#10;(this build)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#1D425C;" vertex="1" parent="1">
+          <mxGeometry x="40" y="100" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="cli" value="Databricks CLI&#10;+ skills" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#1D425C;" vertex="1" parent="1">
+          <mxGeometry x="260" y="100" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="dbx" value="Databricks&#10;(UC, SQL warehouse,&#10;Apps, Genie)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#1D425C;" vertex="1" parent="1">
+          <mxGeometry x="480" y="100" width="180" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="git" value="Git repo" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F4F7;strokeColor=#1D425C;" vertex="1" parent="1">
+          <mxGeometry x="700" y="100" width="140" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="cc" target="cli"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="cli" target="dbx"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;" edge="1" parent="1" source="dbx" target="git"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" value="commits throughout the build" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;dashed=1;fontSize=9;" edge="1" parent="1" source="cc" target="git"><mxGeometry relative="1" as="geometry">
+          <Array as="points"><mxPoint x="130" y="260" /><mxPoint x="770" y="260" /></Array>
+        </mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -148,3 +148,29 @@
 - **Phase 4 closed — user confirmed "all done" at 2026-10-27 14:20 EDT.** Total elapsed since T+0
   (~13:09): ~71 minutes, well inside the T+2:30 build-completion target, leaving the full ~90
   minutes for the story pack and rehearsal.
+
+## Phase 5 — Story pack (2026-10-27 14:21-14:28 EDT, well under the 30-min box)
+- **Decision:** Built `deck/Presales_Deck.pptx` from the template via python-pptx
+  (`deck/build_deck.py`), replacing exact-match placeholder runs so existing Calibri/white-background
+  formatting was never touched. Verified `show="0"` on all 8 backup slides survived the save (the
+  known Free-Edition-adjacent pptx gotcha from the lessons learned), and verified no leftover
+  bracket placeholders anywhere in the deck.
+- **Decision:** Interpreted the ambiguous "name the app screenshot slides 4, 5 and 6" instruction as
+  "give the 4 screenshot backup slides real names instead of generic numbers" (Executive page, Key
+  Figures page, App Home, App Ask the Genie) rather than a literal slide-4/5/6 renumbering, since the
+  template only has 4 screenshot backup slides and these are the 4 highest-priority of the 6 listed
+  in demo/fallback/SCREENSHOTS_TO_TAKE.md. Noting this as a judgment call on an underspecified
+  instruction, not a correction.
+- **Decision:** Generated 3 diagrams (architecture, data model, toolchain) as matplotlib JPGs plus
+  hand-written `.drawio` XML companions, with orthogonal connectors and no line crossing a box, and
+  embedded the JPGs directly into their backup slides (8, 9, 14) rather than leaving them as
+  "insert image" text placeholders.
+- **Decision:** All dollar figures in story/STORYLINE.md, story/OBJECTIONS.md, and
+  demo/DEMO_SCRIPT.md cross-checked against RESULTS.md by grep before finalizing — 30.83%,
+  $286,569, −$221,409, $65,160 all consistent across every file that cites them.
+- **Decision:** story/OBJECTIONS.md labels pipeline latency (median 2.6 min, p95 4.8 min) explicitly
+  as coming from the synthetic data's own generated timestamps, never to be presented as live
+  pipeline throughput — per the hard constraint on this point.
+- Wrote README.md (one page, problem/approach/how-to-run/real-vs-assumed), demo/DEMO_SCRIPT.md
+  (ordered executive → technical leader → business leader, ~9 min of click path),
+  demo/fallback/SCREENSHOTS_TO_TAKE.md (6 screenshots, 4 mapped to deck backup slides).
