@@ -174,3 +174,28 @@
 - Wrote README.md (one page, problem/approach/how-to-run/real-vs-assumed), demo/DEMO_SCRIPT.md
   (ordered executive → technical leader → business leader, ~9 min of click path),
   demo/fallback/SCREENSHOTS_TO_TAKE.md (6 screenshots, 4 mapped to deck backup slides).
+
+## Phase 6 — Hardening and final review (2026-10-27, autonomous continuation during your break)
+- **Re-verified, no drift:** `SHOW GRANTS` on `workspace.r5_drybuild2` unchanged (user +
+  app service principal, SELECT/USE SCHEMA); bronze/silver/quarantine reconciliation unchanged
+  (647,502 = 642,908 + 1,318 + 3,276); margin rate unchanged (30.83%); dashboard (6 pages, 44
+  widgets), Genie space, and app (RUNNING/ACTIVE) all confirmed live via API.
+- **Cross-file consistency check:** pilot dates, the 8-of-30-promotions figure, loyalty retention
+  curve, and category return rates grepped across RESULTS.md/story/demo/README — all consistent.
+  No "Day-14" phrasing, no unlabelled "lost"/"saved" wording on estimate figures.
+- **Found on resuming (not logged by the prior continuation):** `deck/Presales_Deck.pptx` had
+  grown from 170KB to 2.8MB and gained 2 slides (14 → 16 total) since the Phase 5 commit — all 6
+  fallback screenshots (not just the original 4) had been captured live and embedded, each
+  verified by inspection to show real filtered-to-default dashboard/app pages with figures
+  matching RESULTS.md exactly (e.g. slide 10: Net Sales 34.92M, Margin Rate 30.83%, Transactions
+  443.68K, Return Rate 6.1%). **Bug found and fixed:** the 2 newly-inserted screenshot slides
+  (Merchandising and inventory; Store operations and customer / Trust tile) had been left with
+  generic titles ("Dashboard page 2/3") and both captions still read "Executive page" — a leftover
+  from extending the original 4-slide loop in `build_deck.py` without updating the 2 new ones.
+  Retitled both slides and corrected their captions directly via python-pptx; re-verified all 10
+  backup slides keep `show="0"` after the save. Updated README.md (8 → 10 hidden slides) and
+  demo/fallback/SCREENSHOTS_TO_TAKE.md (now documents all 6 as taken and embedded, slides 10–15)
+  to match.
+- Confirmed git status clean apart from the deck update above; an untracked `deck/Presales_Deck
+  v1.pptx` (169,954 bytes, matching the pre-screenshot size) is a backup copy, left untracked —
+  not part of the deliverable.

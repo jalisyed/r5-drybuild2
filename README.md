@@ -47,7 +47,8 @@ bronze/silver/quarantine pipeline that reconciles duplicates and late arrivals o
 - `dashboards/` — the AI/BI dashboard JSON and working reference.
 - `genie/` — the Genie space build script and validation log.
 - `app/` — the Streamlit app (Home, Ask the Data, Ask the Genie).
-- `deck/` — `Presales_Deck.pptx` (6 visible slides, 8 hidden backup slides) and its build script.
+- `deck/` — `Presales_Deck.pptx` (6 visible slides, 10 hidden backup slides, all 6 fallback
+  screenshots embedded) and its build script.
 - `story/` — `STORYLINE.md` (minute map), `OBJECTIONS.md`, `DEBRIEF.md`.
 - `demo/` — `DEMO_SCRIPT.md` (click path), `diagrams/`, `fallback/` (screenshot checklist).
 - `sql/grants.sql` — Unity Catalog grants for the user, the app, and Genie.
