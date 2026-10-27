@@ -1,0 +1,593 @@
+{
+  "datasets": [
+    {
+      "name": "ds_exec",
+      "displayName": "Daily store/category sales",
+      "queryLines": [
+        "SELECT event_date, region, category, channel, net_sales, margin, discount_amt, units, transactions ",
+        "FROM gold_daily_store_category"
+      ],
+      "columns": [
+        {"displayName": "Net Sales", "description": "Total net sales", "expression": "SUM(`net_sales`)"},
+        {"displayName": "Net Margin", "description": "Total net margin (fixed definition)", "expression": "SUM(`margin`)"},
+        {"displayName": "Margin Rate", "description": "Net margin divided by sales after returns (fixed definition)", "expression": "SUM(`margin`) / SUM(`net_sales`)"},
+        {"displayName": "Total Transactions", "description": "Total transactions", "expression": "SUM(`transactions`)"}
+      ]
+    },
+    {
+      "name": "ds_leakage",
+      "displayName": "Margin leakage (returns and discounts)",
+      "queryLines": [
+        "SELECT month, category, gross_net_sales, returns_value, discount_given, net_margin ",
+        "FROM gold_margin_leakage"
+      ],
+      "columns": [
+        {"displayName": "Return Rate", "description": "Returns value over gross net sales", "expression": "SUM(`returns_value`) / SUM(`gross_net_sales`)"},
+        {"displayName": "Discount Rate", "description": "Discount given over gross net sales plus discount", "expression": "SUM(`discount_given`) / (SUM(`gross_net_sales`) + SUM(`discount_given`))"}
+      ]
+    },
+    {
+      "name": "ds_promo",
+      "displayName": "Promotion effectiveness",
+      "queryLines": [
+        "SELECT promo_id, promo_name, category, start_date, discount_pct, promo_days, lift, margin_change_per_day, verdict ",
+        "FROM gold_promo_effectiveness"
+      ]
+    },
+    {
+      "name": "ds_stockout",
+      "displayName": "Stock-out exposure",
+      "queryLines": [
+        "SELECT store_id, sku, category, week_start, stockout_days, est_lost_units, est_lost_margin ",
+        "FROM gold_stockout_exposure"
+      ]
+    },
+    {
+      "name": "ds_hourly",
+      "displayName": "Sales by weekday and hour",
+      "queryLines": [
+        "SELECT date_format(event_date,'E') AS dow_name, dayofweek(event_date) AS dow, hour(event_ts) AS hr, ",
+        "       count(DISTINCT txn_id) AS transactions, sum(net_sales) AS net_sales ",
+        "FROM silver_sales_lines ",
+        "GROUP BY dow_name, dow, hr"
+      ]
+    },
+    {
+      "name": "ds_loyalty",
+      "displayName": "Loyalty cohort retention",
+      "queryLines": [
+        "WITH cohort_share AS ( ",
+        "  SELECT g.cohort_month, g.months_since, g.active_customers / c0.n0 AS share ",
+        "  FROM gold_loyalty_cohorts g ",
+        "  JOIN (SELECT cohort_month, active_customers AS n0 FROM gold_loyalty_cohorts WHERE months_since = 0) c0 ",
+        "    ON g.cohort_month = c0.cohort_month ",
+        ") ",
+        "SELECT months_since, avg(share) AS share_still_buying ",
+        "FROM cohort_share ",
+        "GROUP BY months_since"
+      ]
+    },
+    {
+      "name": "ds_basket",
+      "displayName": "Basket affinity (top pairs)",
+      "queryLines": [
+        "SELECT sku_a, sku_b, together, lift ",
+        "FROM gold_basket_affinity ",
+        "ORDER BY lift DESC LIMIT 10"
+      ]
+    },
+    {
+      "name": "ds_trust",
+      "displayName": "Data trust",
+      "queryLines": [
+        "SELECT bronze_rows, silver_rows, quarantined_rows, duplicates_removed_est, ",
+        "       median_latency_min, p95_latency_min, late_share, latest_event_ts ",
+        "FROM gold_data_trust"
+      ]
+    },
+    {
+      "name": "ds_quarantine",
+      "displayName": "Quarantined rows by reason",
+      "queryLines": [
+        "SELECT reason, count(*) AS rows_count, count(DISTINCT store_id) AS stores_affected ",
+        "FROM silver_quarantine ",
+        "GROUP BY reason"
+      ]
+    },
+    {
+      "name": "ds_margin_at_risk",
+      "displayName": "Margin at risk before the next peak (ESTIMATE)",
+      "queryLines": [
+        "SELECT ",
+        "  (SELECT sum(CASE WHEN verdict='margin dilutive' THEN margin_change_per_day*promo_days ELSE 0 END) FROM gold_promo_effectiveness) AS promo_margin_below_baseline, ",
+        "  (SELECT sum(est_lost_margin) FROM gold_stockout_exposure) AS stockout_est_margin, ",
+        "  (SELECT abs(sum(CASE WHEN verdict='margin dilutive' THEN margin_change_per_day*promo_days ELSE 0 END)) FROM gold_promo_effectiveness) ",
+        "    + (SELECT sum(est_lost_margin) FROM gold_stockout_exposure) AS total_margin_at_risk"
+      ]
+    },
+    {
+      "name": "ds_other_denominator",
+      "displayName": "Margin rate, other denominator (same dollars, different denominator)",
+      "queryLines": [
+        "SELECT sum(net_margin) / sum(gross_net_sales) AS margin_rate_other_denominator ",
+        "FROM gold_margin_leakage"
+      ]
+    },
+    {
+      "name": "ds_loyalty_milestones",
+      "displayName": "Loyalty retention milestones",
+      "queryLines": [
+        "WITH cohort_share AS ( ",
+        "  SELECT g.cohort_month, g.months_since, g.active_customers / c0.n0 AS share ",
+        "  FROM gold_loyalty_cohorts g ",
+        "  JOIN (SELECT cohort_month, active_customers AS n0 FROM gold_loyalty_cohorts WHERE months_since = 0) c0 ",
+        "    ON g.cohort_month = c0.cohort_month ",
+        ") ",
+        "SELECT months_since, avg(share) AS share_still_buying ",
+        "FROM cohort_share ",
+        "WHERE months_since IN (1,3,6,12) ",
+        "GROUP BY months_since"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "executive",
+      "displayName": "Executive",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {"name": "exec-header", "multilineTextboxSpec": {"lines": [
+            "# Where margin is made and lost\n",
+            "One governed margin definition: net margin = sales after discounts, less returns, less cost of goods sold. Margin rate = net margin ÷ sales after returns."
+          ]}},
+          "position": {"x": 0, "y": 0, "width": 12, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "kpi-net-sales",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "measure(Net Sales)", "expression": "MEASURE(`Net Sales`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "measure(Net Sales)", "displayName": "Net Sales", "format": {"type": "number-currency", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}, "frame": {"title": "Net Sales", "showTitle": true}}
+          },
+          "position": {"x": 0, "y": 2, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi-margin-rate",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "measure(Margin Rate)", "expression": "MEASURE(`Margin Rate`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "measure(Margin Rate)", "displayName": "Margin Rate", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 2}}}}, "frame": {"title": "Margin Rate (fixed definition)", "showTitle": true}}
+          },
+          "position": {"x": 3, "y": 2, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi-transactions",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "measure(Total Transactions)", "expression": "MEASURE(`Total Transactions`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "measure(Total Transactions)", "displayName": "Transactions", "format": {"type": "number", "abbreviation": "compact", "decimalPlaces": {"type": "max", "places": 1}}}}, "frame": {"title": "Transactions", "showTitle": true}}
+          },
+          "position": {"x": 6, "y": 2, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi-return-rate",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_leakage", "fields": [{"name": "measure(Return Rate)", "expression": "MEASURE(`Return Rate`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "measure(Return Rate)", "displayName": "Return Rate", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}}, "frame": {"title": "Return Rate", "showTitle": true}}
+          },
+          "position": {"x": 9, "y": 2, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "bar-margin-by-category",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "category", "expression": "`category`"}, {"name": "sum(margin)", "expression": "SUM(`margin`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`margin`)"}]}}],
+            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "category", "scale": {"type": "categorical"}}, "y": {"fieldName": "sum(margin)", "scale": {"type": "quantitative"}, "displayName": "Net margin"}}, "frame": {"title": "Where does profit come from?", "showTitle": true, "showDescription": true, "description": "Net margin by category"}}
+          },
+          "position": {"x": 0, "y": 5, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "line-sales-by-month",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "monthly(event_date)", "expression": "DATE_TRUNC(\"MONTH\", `event_date`)"}, {"name": "sum(net_sales)", "expression": "SUM(`net_sales`)"}], "disaggregated": false, "orders": [{"direction": "ASC", "expression": "DATE_TRUNC(\"MONTH\", `event_date`)"}]}}],
+            "spec": {"version": 3, "widgetType": "line", "encodings": {"x": {"fieldName": "monthly(event_date)", "scale": {"type": "temporal"}}, "y": {"fieldName": "sum(net_sales)", "scale": {"type": "quantitative"}, "displayName": "Net sales"}}, "frame": {"title": "What is the rhythm of demand?", "showTitle": true, "showDescription": true, "description": "Net sales by month — December is the peak"}}
+          },
+          "position": {"x": 6, "y": 5, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "bar-region",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "region", "expression": "`region`"}, {"name": "sum(net_sales)", "expression": "SUM(`net_sales`)"}, {"name": "sum(margin)", "expression": "SUM(`margin`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`net_sales`)"}]}}],
+            "spec": {"version": 1, "widgetType": "combo", "encodings": {"x": {"fieldName": "region", "scale": {"type": "categorical"}}, "y": {"scale": {"type": "quantitative"}, "primary": {"fields": [{"fieldName": "sum(net_sales)", "displayName": "Net sales"}]}, "secondary": {"fields": [{"fieldName": "sum(margin)", "displayName": "Net margin"}]}}}, "frame": {"title": "Which regions carry us?", "showTitle": true, "showDescription": true, "description": "Net sales (bars) and net margin (line) by region"}}
+          },
+          "position": {"x": 0, "y": 11, "width": 12, "height": 6}
+        }
+      ]
+    },
+    {
+      "name": "merchandising",
+      "displayName": "Merchandising and inventory",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {"name": "merch-header", "multilineTextboxSpec": {"lines": [
+            "# Where stock-outs and promotions cost margin, ahead of the next peak\n",
+            "Stock-out loss is an ESTIMATE (sales are not generated to dip during a stock-out in this synthetic data, so treat it as modeled, not measured)."
+          ]}},
+          "position": {"x": 0, "y": 0, "width": 12, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "scatter-promo",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_promo", "fields": [{"name": "discount_pct", "expression": "`discount_pct`"}, {"name": "margin_change_per_day", "expression": "`margin_change_per_day`"}, {"name": "verdict", "expression": "`verdict`"}, {"name": "promo_name", "expression": "`promo_name`"}], "disaggregated": true}}],
+            "spec": {"version": 3, "widgetType": "scatter", "encodings": {"x": {"fieldName": "discount_pct", "scale": {"type": "quantitative"}, "displayName": "Discount %"}, "y": {"fieldName": "margin_change_per_day", "scale": {"type": "quantitative"}, "displayName": "Margin change per day ($)"}, "color": {"fieldName": "verdict", "scale": {"type": "categorical", "mappings": [{"value": "margin dilutive", "color": "#FF7E5C"}, {"value": "margin accretive", "color": "#1D9A6C"}]}}}, "frame": {"title": "Which promotions lose money?", "showTitle": true, "showDescription": true, "description": "Deep discounts in the bottom-right lose money even when they sell more"}}
+          },
+          "position": {"x": 0, "y": 2, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "bar-stockout",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_stockout", "fields": [{"name": "category", "expression": "`category`"}, {"name": "sum(est_lost_margin)", "expression": "SUM(`est_lost_margin`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "SUM(`est_lost_margin`)"}]}}],
+            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "category", "scale": {"type": "categorical"}}, "y": {"fieldName": "sum(est_lost_margin)", "scale": {"type": "quantitative"}, "displayName": "Estimated lost margin ($)"}}, "frame": {"title": "What do empty shelves cost? (ESTIMATE)", "showTitle": true, "showDescription": true, "description": "Estimated margin at risk from stock-outs by category"}}
+          },
+          "position": {"x": 6, "y": 2, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "table-worst-promos",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_promo", "fields": [{"name": "promo_name", "expression": "`promo_name`"}, {"name": "category", "expression": "`category`"}, {"name": "discount_pct", "expression": "`discount_pct`"}, {"name": "lift", "expression": "`lift`"}, {"name": "margin_change_per_day", "expression": "`margin_change_per_day`"}, {"name": "verdict", "expression": "`verdict`"}], "disaggregated": true, "orders": [{"direction": "ASC", "expression": "`margin_change_per_day`"}]}}],
+            "spec": {"version": 2, "widgetType": "table", "encodings": {"columns": [
+              {"fieldName": "promo_name", "displayName": "Promotion"},
+              {"fieldName": "category", "displayName": "Category"},
+              {"fieldName": "discount_pct", "displayName": "Discount %", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 0}}},
+              {"fieldName": "lift", "displayName": "Volume lift", "format": {"type": "number", "decimalPlaces": {"type": "max", "places": 2}}},
+              {"fieldName": "margin_change_per_day", "displayName": "Margin change/day ($)", "format": {"type": "number-currency", "decimalPlaces": {"type": "max", "places": 0}}},
+              {"fieldName": "verdict", "displayName": "Verdict"}
+            ]}, "frame": {"title": "Which ones do we stop?", "showTitle": true, "showDescription": true, "description": "10 worst promotions by margin change per day vs. baseline"}}
+          },
+          "position": {"x": 0, "y": 8, "width": 12, "height": 6}
+        }
+      ]
+    },
+    {
+      "name": "store_ops_customer",
+      "displayName": "Store operations and customer",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {"name": "ops-header", "multilineTextboxSpec": {"lines": [
+            "# Loyalty retention, basket behavior, and demand rhythm\n",
+            "Trust tile below: can we stand behind these numbers?"
+          ]}},
+          "position": {"x": 0, "y": 0, "width": 12, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "line-loyalty-retention",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_loyalty", "fields": [{"name": "months_since", "expression": "`months_since`"}, {"name": "avg(share_still_buying)", "expression": "AVG(`share_still_buying`)"}], "disaggregated": false, "orders": [{"direction": "ASC", "expression": "`months_since`"}]}}],
+            "spec": {"version": 3, "widgetType": "line", "encodings": {"x": {"fieldName": "months_since", "scale": {"type": "quantitative"}, "displayName": "Months since first purchase"}, "y": {"fieldName": "avg(share_still_buying)", "scale": {"type": "quantitative"}, "displayName": "Share still buying", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 0}}}}, "frame": {"title": "How quickly do loyalty customers drift?", "showTitle": true, "showDescription": true, "description": "Cohort retention curve, averaged across cohorts"}}
+          },
+          "position": {"x": 0, "y": 2, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "bar-weekday-hour",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_hourly", "fields": [{"name": "hr", "expression": "`hr`"}, {"name": "sum(transactions)", "expression": "SUM(`transactions`)"}], "disaggregated": false, "orders": [{"direction": "ASC", "expression": "`hr`"}]}}],
+            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "hr", "scale": {"type": "categorical"}, "displayName": "Hour of day"}, "y": {"fieldName": "sum(transactions)", "scale": {"type": "quantitative"}, "displayName": "Transactions"}}, "frame": {"title": "When during the day do we sell the most?", "showTitle": true}}
+          },
+          "position": {"x": 6, "y": 2, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "bar-return-discount-rate",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_leakage", "fields": [{"name": "category", "expression": "`category`"}, {"name": "measure(Return Rate)", "expression": "MEASURE(`Return Rate`)"}], "disaggregated": false, "orders": [{"direction": "DESC", "expression": "MEASURE(`Return Rate`)"}]}}],
+            "spec": {"version": 3, "widgetType": "bar", "encodings": {"x": {"fieldName": "category", "scale": {"type": "categorical"}}, "y": {"fieldName": "measure(Return Rate)", "scale": {"type": "quantitative"}, "displayName": "Return rate", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}}, "frame": {"title": "Where does margin leak?", "showTitle": true, "showDescription": true, "description": "Return rate by category — Electronics and Apparel highest"}}
+          },
+          "position": {"x": 0, "y": 8, "width": 6, "height": 6}
+        },
+        {
+          "widget": {
+            "name": "table-basket-affinity",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_basket", "fields": [{"name": "sku_a", "expression": "`sku_a`"}, {"name": "sku_b", "expression": "`sku_b`"}, {"name": "together", "expression": "`together`"}, {"name": "lift", "expression": "`lift`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "table", "encodings": {"columns": [
+              {"fieldName": "sku_a", "displayName": "SKU A"},
+              {"fieldName": "sku_b", "displayName": "SKU B"},
+              {"fieldName": "together", "displayName": "Baskets together"},
+              {"fieldName": "lift", "displayName": "Lift", "format": {"type": "number", "decimalPlaces": {"type": "max", "places": 1}}}
+            ]}, "frame": {"title": "What sells together?", "showTitle": true}}
+          },
+          "position": {"x": 6, "y": 8, "width": 6, "height": 6}
+        },
+        {
+          "widget": {"name": "trust-header", "multilineTextboxSpec": {"lines": ["## Trust tile — can I stand behind these numbers?"]}},
+          "position": {"x": 0, "y": 14, "width": 12, "height": 1}
+        },
+        {
+          "widget": {
+            "name": "kpi-median-latency",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_trust", "fields": [{"name": "median_latency_min", "expression": "`median_latency_min`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "median_latency_min", "displayName": "Median latency (min)", "format": {"type": "number", "decimalPlaces": {"type": "max", "places": 1}}}}, "frame": {"title": "Median latency (min)", "showTitle": true}}
+          },
+          "position": {"x": 0, "y": 15, "width": 2, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi-p95-latency",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_trust", "fields": [{"name": "p95_latency_min", "expression": "`p95_latency_min`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "p95_latency_min", "displayName": "P95 latency (min)", "format": {"type": "number", "decimalPlaces": {"type": "max", "places": 1}}}}, "frame": {"title": "P95 latency (min)", "showTitle": true}}
+          },
+          "position": {"x": 2, "y": 15, "width": 2, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi-late-share",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_trust", "fields": [{"name": "late_share", "expression": "`late_share`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "late_share", "displayName": "Late-arrival share", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 2}}}}, "frame": {"title": "Late-arrival share", "showTitle": true}}
+          },
+          "position": {"x": 4, "y": 15, "width": 2, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi-duplicates",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_trust", "fields": [{"name": "duplicates_removed_est", "expression": "`duplicates_removed_est`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "duplicates_removed_est", "displayName": "Duplicates removed"}}, "frame": {"title": "Duplicates removed", "showTitle": true}}
+          },
+          "position": {"x": 6, "y": 15, "width": 2, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kpi-quarantined",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_trust", "fields": [{"name": "quarantined_rows", "expression": "`quarantined_rows`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "quarantined_rows", "displayName": "Rows quarantined"}}, "frame": {"title": "Rows quarantined", "showTitle": true}}
+          },
+          "position": {"x": 8, "y": 15, "width": 2, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "table-quarantine-reasons",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_quarantine", "fields": [{"name": "reason", "expression": "`reason`"}, {"name": "rows_count", "expression": "`rows_count`"}, {"name": "stores_affected", "expression": "`stores_affected`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "table", "encodings": {"columns": [
+              {"fieldName": "reason", "displayName": "Rejection reason"},
+              {"fieldName": "rows_count", "displayName": "Rows"},
+              {"fieldName": "stores_affected", "displayName": "Stores affected"}
+            ]}, "frame": {"title": "Which rows were rejected and why?", "showTitle": true}}
+          },
+          "position": {"x": 10, "y": 15, "width": 2, "height": 3}
+        }
+      ]
+    },
+    {
+      "name": "key_figures",
+      "displayName": "Key Figures",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {"name": "kf-header", "multilineTextboxSpec": {"lines": [
+            "# Key Figures\n",
+            "\n",
+            "The numbers each leader asked about, under one governed definition. Net margin = sales after discounts, less returns, less cost of goods sold. Margin rate = net margin ÷ sales after returns. All figures are from a synthetic sample."
+          ]}},
+          "position": {"x": 0, "y": 0, "width": 12, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kf-net-sales",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "measure(Net Sales)", "expression": "MEASURE(`Net Sales`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "measure(Net Sales)", "displayName": "Net Sales", "format": {"type": "number-currency", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}, "frame": {"title": "Net Sales", "showTitle": true}}
+          },
+          "position": {"x": 0, "y": 3, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kf-net-margin",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "measure(Net Margin)", "expression": "MEASURE(`Net Margin`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "measure(Net Margin)", "displayName": "Net Margin", "format": {"type": "number-currency", "decimalPlaces": {"type": "max", "places": 0}, "abbreviation": "compact"}}}, "frame": {"title": "Net Margin", "showTitle": true}}
+          },
+          "position": {"x": 3, "y": 3, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kf-margin-rate-fixed",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_exec", "fields": [{"name": "measure(Margin Rate)", "expression": "MEASURE(`Margin Rate`)"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "measure(Margin Rate)", "displayName": "Margin Rate", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 2}}}}, "frame": {"title": "Margin Rate — THE fixed definition", "showTitle": true, "showDescription": true, "description": "Net margin ÷ sales after returns"}}
+          },
+          "position": {"x": 6, "y": 3, "width": 3, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kf-margin-rate-other",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_other_denominator", "fields": [{"name": "margin_rate_other_denominator", "expression": "`margin_rate_other_denominator`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "margin_rate_other_denominator", "displayName": "Margin Rate (other denominator)", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 2}}}}, "frame": {"title": "Same dollars, different denominator", "showTitle": true, "showDescription": true, "description": "NOT the headline rate — reference only"}}
+          },
+          "position": {"x": 9, "y": 3, "width": 3, "height": 3}
+        },
+        {
+          "widget": {"name": "kf-subheader-risk", "multilineTextboxSpec": {"lines": ["## Margin at risk before the next peak (ESTIMATE)"]}},
+          "position": {"x": 0, "y": 6, "width": 12, "height": 1}
+        },
+        {
+          "widget": {
+            "name": "kf-promo-below-baseline",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_margin_at_risk", "fields": [{"name": "promo_margin_below_baseline", "expression": "`promo_margin_below_baseline`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "promo_margin_below_baseline", "displayName": "Promotion margin below baseline", "format": {"type": "number-currency", "decimalPlaces": {"type": "max", "places": 0}}}}, "frame": {"title": "Promotions below baseline (ESTIMATE)", "showTitle": true, "showDescription": true, "description": "8 of 30 promotions verdict “margin dilutive”"}}
+          },
+          "position": {"x": 0, "y": 7, "width": 4, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kf-stockout-estimate",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_margin_at_risk", "fields": [{"name": "stockout_est_margin", "expression": "`stockout_est_margin`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "stockout_est_margin", "displayName": "Stock-out margin", "format": {"type": "number-currency", "decimalPlaces": {"type": "max", "places": 0}}}}, "frame": {"title": "Stock-out exposure (ESTIMATE)", "showTitle": true, "showDescription": true, "description": "Modeled, not a measured effect"}}
+          },
+          "position": {"x": 4, "y": 7, "width": 4, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "kf-total-at-risk",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_margin_at_risk", "fields": [{"name": "total_margin_at_risk", "expression": "`total_margin_at_risk`"}], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "counter", "encodings": {"value": {"fieldName": "total_margin_at_risk", "displayName": "Total margin at risk", "format": {"type": "number-currency", "decimalPlaces": {"type": "max", "places": 0}}}}, "frame": {"title": "Margin at risk before the next peak (ESTIMATE)", "showTitle": true, "showDescription": true, "description": "Promotion margin below baseline + estimated stock-out margin"}}
+          },
+          "position": {"x": 8, "y": 7, "width": 4, "height": 3}
+        },
+        {
+          "widget": {"name": "kf-subheader-loyalty", "multilineTextboxSpec": {"lines": ["## Loyalty retention milestones"]}},
+          "position": {"x": 0, "y": 10, "width": 12, "height": 1}
+        },
+        {
+          "widget": {
+            "name": "kf-loyalty-table",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_loyalty_milestones", "fields": [{"name": "months_since", "expression": "`months_since`"}, {"name": "share_still_buying", "expression": "`share_still_buying`"}], "disaggregated": true, "orders": [{"direction": "ASC", "expression": "`months_since`"}]}}],
+            "spec": {"version": 2, "widgetType": "table", "encodings": {"columns": [
+              {"fieldName": "months_since", "displayName": "Months since first purchase"},
+              {"fieldName": "share_still_buying", "displayName": "Share still buying", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 1}}}
+            ]}, "frame": {"title": "Loyalty cohort retention — the board's “one trusted number”", "showTitle": true}}
+          },
+          "position": {"x": 0, "y": 11, "width": 6, "height": 5}
+        },
+        {
+          "widget": {
+            "name": "kf-trust-table",
+            "queries": [{"name": "main_query", "query": {"datasetName": "ds_trust", "fields": [
+              {"name": "bronze_rows", "expression": "`bronze_rows`"},
+              {"name": "silver_rows", "expression": "`silver_rows`"},
+              {"name": "quarantined_rows", "expression": "`quarantined_rows`"},
+              {"name": "duplicates_removed_est", "expression": "`duplicates_removed_est`"},
+              {"name": "late_share", "expression": "`late_share`"}
+            ], "disaggregated": true}}],
+            "spec": {"version": 2, "widgetType": "table", "encodings": {"columns": [
+              {"fieldName": "bronze_rows", "displayName": "Bronze rows"},
+              {"fieldName": "silver_rows", "displayName": "Silver rows"},
+              {"fieldName": "quarantined_rows", "displayName": "Quarantined"},
+              {"fieldName": "duplicates_removed_est", "displayName": "Duplicates removed"},
+              {"fieldName": "late_share", "displayName": "Late-arrival share", "format": {"type": "number-percent", "decimalPlaces": {"type": "max", "places": 2}}}
+            ]}, "frame": {"title": "Data trust recap — can we stand behind these numbers?", "showTitle": true}}
+          },
+          "position": {"x": 6, "y": 11, "width": 6, "height": 5}
+        }
+      ]
+    },
+    {
+      "name": "glossary",
+      "displayName": "Business Glossary",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {"name": "gloss-header", "multilineTextboxSpec": {"lines": ["# Business Glossary\n", "\n", "Plain-language definitions for every figure on this dashboard. All figures are from a synthetic sample."]}},
+          "position": {"x": 0, "y": 0, "width": 12, "height": 2}
+        },
+        {
+          "widget": {"name": "gloss-margin", "multilineTextboxSpec": {"lines": [
+            "### Net margin and margin rate (THE fixed definition)\n",
+            "\n",
+            "**Net margin** = sales after discounts, less returns, less cost of goods sold. Discounts are never subtracted a second time.\n",
+            "\n",
+            "**Margin rate** = net margin ÷ sales after returns. On this data: **30.83%**.\n",
+            "\n",
+            "A second figure sometimes appears — net margin ÷ a different sales total (28.95% on this data). That is the **same dollars, different denominator**. It is shown for reference only and is never the headline rate. This is exactly the kind of inconsistency that made the board unable to trust a single loyalty or margin number — one definition, used everywhere, fixes it."
+          ]}},
+          "position": {"x": 0, "y": 2, "width": 6, "height": 7}
+        },
+        {
+          "widget": {"name": "gloss-estimates", "multilineTextboxSpec": {"lines": [
+            "### What “ESTIMATE” means here\n",
+            "\n",
+            "**Promotion margin below baseline**: the modeled gap between a promotion's actual margin per day and a baseline sell-through rate. It is a comparison to a model, not a cash measurement — call it “below baseline,” never “lost” or “saved.”\n",
+            "\n",
+            "**Stock-out margin**: sales are not generated to dip during a stock-out in this synthetic sample, so this is a modeled estimate of what empty shelves may be costing, not a measured effect.\n",
+            "\n",
+            "Both are labelled ESTIMATE everywhere they appear, and both combine into the single **“margin at risk before the next peak”** figure on the Key Figures page."
+          ]}},
+          "position": {"x": 6, "y": 2, "width": 6, "height": 7}
+        },
+        {
+          "widget": {"name": "gloss-sources", "multilineTextboxSpec": {"lines": [
+            "### Data sources (assumed, synthetic)\n",
+            "\n",
+            "- **Point-of-sale transaction files** (daily export) — explains why a file arriving twice can double-count revenue, and why reprocessing needs to be safe.\n",
+            "- **Weekly inventory snapshot feed**, per store and product — the basis for stock-out exposure.\n",
+            "- **Loyalty file**, from the program vendor — the basis for retention.\n",
+            "- **Promotions calendar** — the basis for promotion effectiveness.\n",
+            "\n",
+            "All data in this build is synthetic, generated with a fixed seed. No real customer, employer or confidential data is used anywhere."
+          ]}},
+          "position": {"x": 0, "y": 9, "width": 6, "height": 6}
+        },
+        {
+          "widget": {"name": "gloss-scope", "multilineTextboxSpec": {"lines": [
+            "### What this build does and does not do\n",
+            "\n",
+            "**Built**: the pipeline counts, quarantines and reports bad rows, duplicates and late arrivals (see the trust tile and this page's data trust recap).\n",
+            "\n",
+            "**Not built — pilot additions**: automated alerting on bad data, schema-change detection, access-control enforcement, and promotion attribution modeling. Unity Catalog grants (see sql/grants.sql) show the mechanism for access control; enforcement workflows are a pilot addition, not demonstrated here.\n",
+            "\n",
+            "Customer email and phone fields in the source data are synthetic placeholders for a governance conversation, not real data."
+          ]}},
+          "position": {"x": 6, "y": 9, "width": 6, "height": 6}
+        }
+      ]
+    },
+    {
+      "name": "filters",
+      "displayName": "Filters",
+      "pageType": "PAGE_TYPE_GLOBAL_FILTERS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "filter-date",
+            "queries": [
+              {"name": "q_exec_date", "query": {"datasetName": "ds_exec", "fields": [{"name": "event_date", "expression": "`event_date`"}], "disaggregated": false}},
+              {"name": "q_leakage_date", "query": {"datasetName": "ds_leakage", "fields": [{"name": "month", "expression": "`month`"}], "disaggregated": false}},
+              {"name": "q_stockout_date", "query": {"datasetName": "ds_stockout", "fields": [{"name": "week_start", "expression": "`week_start`"}], "disaggregated": false}}
+            ],
+            "spec": {"version": 2, "widgetType": "filter-date-range-picker", "encodings": {"fields": [
+              {"fieldName": "event_date", "displayName": "Date (Executive)", "queryName": "q_exec_date"},
+              {"fieldName": "month", "displayName": "Date (Margin leakage)", "queryName": "q_leakage_date"},
+              {"fieldName": "week_start", "displayName": "Date (Stock-out)", "queryName": "q_stockout_date"}
+            ]}, "frame": {"showTitle": true, "title": "Date"}}
+          },
+          "position": {"x": 0, "y": 0, "width": 4, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "filter-region",
+            "queries": [{"name": "q_exec_region", "query": {"datasetName": "ds_exec", "fields": [{"name": "region", "expression": "`region`"}], "disaggregated": false}}],
+            "spec": {"version": 2, "widgetType": "filter-multi-select", "encodings": {"fields": [{"fieldName": "region", "displayName": "Region", "queryName": "q_exec_region"}]}, "frame": {"showTitle": true, "title": "Region"}}
+          },
+          "position": {"x": 4, "y": 0, "width": 4, "height": 2}
+        },
+        {
+          "widget": {
+            "name": "filter-category",
+            "queries": [
+              {"name": "q_exec_cat", "query": {"datasetName": "ds_exec", "fields": [{"name": "category", "expression": "`category`"}], "disaggregated": false}},
+              {"name": "q_leakage_cat", "query": {"datasetName": "ds_leakage", "fields": [{"name": "category", "expression": "`category`"}], "disaggregated": false}},
+              {"name": "q_stockout_cat", "query": {"datasetName": "ds_stockout", "fields": [{"name": "category", "expression": "`category`"}], "disaggregated": false}},
+              {"name": "q_promo_cat", "query": {"datasetName": "ds_promo", "fields": [{"name": "category", "expression": "`category`"}], "disaggregated": false}}
+            ],
+            "spec": {"version": 2, "widgetType": "filter-multi-select", "encodings": {"fields": [
+              {"fieldName": "category", "displayName": "Category (Executive)", "queryName": "q_exec_cat"},
+              {"fieldName": "category", "displayName": "Category (Margin leakage)", "queryName": "q_leakage_cat"},
+              {"fieldName": "category", "displayName": "Category (Stock-out)", "queryName": "q_stockout_cat"},
+              {"fieldName": "category", "displayName": "Category (Promotions)", "queryName": "q_promo_cat"}
+            ]}, "frame": {"showTitle": true, "title": "Category"}}
+          },
+          "position": {"x": 8, "y": 0, "width": 4, "height": 2}
+        }
+      ]
+    }
+  ],
+  "uiSettings": {
+    "theme": {
+      "canvasBackgroundColor": {"light": "#FCFCFC", "dark": "#1F272D"},
+      "widgetBackgroundColor": {"light": "#FFFFFF", "dark": "#11171C"},
+      "widgetBorderColor": {"light": "#FFFFFF", "dark": "#11171C"},
+      "fontColor": {"light": "#11171C", "dark": "#E8ECF0"},
+      "selectionColor": {"light": "#2272B4", "dark": "#8ACAFF"},
+      "visualizationColors": ["#0D6EFD", "#FFA600", "#1D9A6C", "#995495", "#4E5185", "#1D425C", "#FF7E5C"],
+      "widgetHeaderAlignment": "LEFT"
+    }
+  }
+}

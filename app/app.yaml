@@ -1,0 +1,8 @@
+command: ["streamlit", "run", "Home.py"]
+env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
+  - name: GENIE_SPACE_ID
+    valueFrom: genie-space
+  - name: DASHBOARD_URL
+    value: "https://dbc-be4eeba5-e3b8.cloud.databricks.com/sql/dashboardsv3/01f1d22c47d2198dbb66a7f52412e4ae"

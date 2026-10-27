@@ -1,0 +1,263 @@
+{
+  "version": 2,
+  "config": {
+    "sample_questions": [
+      {
+        "id": "06f787ef21204e44849630be00ec562a",
+        "question": [
+          "Which categories earn our margin, and how is each trending?"
+        ]
+      },
+      {
+        "id": "3c268d2582424de7910fc9216a58579a",
+        "question": [
+          "Where are stock-outs costing us the most (estimated)?"
+        ]
+      },
+      {
+        "id": "6ef97d4035a14267a18ffd7ba3532129",
+        "question": [
+          "Where do returns and discounts eat into sales?"
+        ]
+      },
+      {
+        "id": "7a4332c49da74dcb9a19c672c0fd3f6a",
+        "question": [
+          "Which products are bought together most often?"
+        ]
+      },
+      {
+        "id": "8400fba659c34529a8d263ea5597b05e",
+        "question": [
+          "Which promotions lost us money, even though they sold more?"
+        ]
+      },
+      {
+        "id": "9fca645125854f6aa056f287ec6c4262",
+        "question": [
+          "How many loyalty customers are still buying 1, 3, 6 and 12 months after their first purchase?"
+        ]
+      },
+      {
+        "id": "ada3c0d918cd4496b424f4486286121f",
+        "question": [
+          "How does sales compare by region?"
+        ]
+      },
+      {
+        "id": "f348bb80f61e479a8260871f7718cd9c",
+        "question": [
+          "How fresh and complete is the data behind these numbers?"
+        ]
+      },
+      {
+        "id": "fe9e086058d4455ab15e4be8c21360b6",
+        "question": [
+          "Which rows were rejected and why?"
+        ]
+      }
+    ]
+  },
+  "data_sources": {
+    "tables": [
+      {
+        "identifier": "workspace.r5_drybuild2.gold_basket_affinity"
+      },
+      {
+        "identifier": "workspace.r5_drybuild2.gold_daily_store_category",
+        "column_configs": [
+          {
+            "column_name": "category",
+            "enable_format_assistance": true,
+            "enable_entity_matching": true,
+            "description": [
+              "Product category: Grocery, Fresh, Apparel, Home, Electronics, Health & Beauty."
+            ]
+          },
+          {
+            "column_name": "margin",
+            "description": [
+              "Net margin: sales after discounts, less returns, less cost of goods sold. Never subtract discount a second time."
+            ]
+          },
+          {
+            "column_name": "region",
+            "enable_format_assistance": true,
+            "enable_entity_matching": true,
+            "description": [
+              "Sales region: Ontario, Quebec, British Columbia, Prairies, Atlantic."
+            ]
+          }
+        ]
+      },
+      {
+        "identifier": "workspace.r5_drybuild2.gold_data_trust"
+      },
+      {
+        "identifier": "workspace.r5_drybuild2.gold_loyalty_cohorts"
+      },
+      {
+        "identifier": "workspace.r5_drybuild2.gold_margin_leakage",
+        "column_configs": [
+          {
+            "column_name": "category",
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          }
+        ]
+      },
+      {
+        "identifier": "workspace.r5_drybuild2.gold_promo_effectiveness",
+        "column_configs": [
+          {
+            "column_name": "category",
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "verdict",
+            "enable_format_assistance": true,
+            "enable_entity_matching": true,
+            "description": [
+              "'margin dilutive' = margin per day during the promotion is below the 28 days before it started. 'margin accretive' = margin per day rose."
+            ]
+          }
+        ]
+      },
+      {
+        "identifier": "workspace.r5_drybuild2.gold_stockout_exposure",
+        "column_configs": [
+          {
+            "column_name": "category",
+            "enable_format_assistance": true,
+            "enable_entity_matching": true
+          },
+          {
+            "column_name": "est_lost_margin",
+            "description": [
+              "ESTIMATE only (expected weekly units x days out x unit margin) - always say so, never claim a measured loss."
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "instructions": {
+    "example_question_sqls": [
+      {
+        "id": "0d70bc332b3e472484e8506594d1246b",
+        "question": [
+          "Where are stock-outs costing us the most (estimated)?"
+        ],
+        "sql": [
+          "SELECT category, count(*) AS store_sku_weeks_out, round(sum(est_lost_units),0) AS est_lost_units, round(sum(est_lost_margin),0) AS est_lost_margin FROM workspace.r5_drybuild2.gold_stockout_exposure GROUP BY category ORDER BY est_lost_margin DESC"
+        ]
+      },
+      {
+        "id": "27ce524429734d19807ef34e235a0e80",
+        "question": [
+          "How does sales compare by region?"
+        ],
+        "sql": [
+          "SELECT region, round(sum(net_sales),0) AS net_sales, round(sum(margin),0) AS margin, sum(transactions) AS transactions FROM workspace.r5_drybuild2.gold_daily_store_category GROUP BY region ORDER BY net_sales DESC"
+        ]
+      },
+      {
+        "id": "4c59615d521b46f9984a07d1980fce7a",
+        "question": [
+          "How many loyalty customers are still buying 1, 3, 6 and 12 months after their first purchase?"
+        ],
+        "sql": [
+          "WITH c0 AS (SELECT cohort_month, active_customers AS n0 FROM workspace.r5_drybuild2.gold_loyalty_cohorts WHERE months_since = 0) SELECT g.months_since, round(avg(g.active_customers / c0.n0),3) AS share_still_buying FROM workspace.r5_drybuild2.gold_loyalty_cohorts g JOIN c0 ON g.cohort_month = c0.cohort_month WHERE g.months_since IN (0,1,3,6,12) GROUP BY g.months_since ORDER BY g.months_since"
+        ]
+      },
+      {
+        "id": "710a089a8b9e4774bef81e9dff865e4c",
+        "question": [
+          "Where do returns and discounts eat into sales?"
+        ],
+        "sql": [
+          "SELECT category, round(sum(returns_value)/sum(gross_net_sales),3) AS return_rate_value, round(sum(discount_given)/(sum(gross_net_sales)+sum(discount_given)),3) AS discount_rate FROM workspace.r5_drybuild2.gold_margin_leakage GROUP BY category ORDER BY return_rate_value DESC"
+        ]
+      },
+      {
+        "id": "773cab5fe690453b87bd35a93d176031",
+        "question": [
+          "Which promotions lost us money, even though they sold more?"
+        ],
+        "sql": [
+          "SELECT promo_name, discount_pct, round(lift,2) AS volume_lift, round(margin_change_per_day,0) AS margin_change_per_day, verdict FROM workspace.r5_drybuild2.gold_promo_effectiveness ORDER BY margin_change_per_day LIMIT 10"
+        ]
+      },
+      {
+        "id": "ea6a243551d644359f53fc161c26fcae",
+        "question": [
+          "Which products are bought together most often?"
+        ],
+        "sql": [
+          "SELECT sku_a, sku_b, together, round(lift,1) AS lift FROM workspace.r5_drybuild2.gold_basket_affinity ORDER BY lift DESC LIMIT 10"
+        ]
+      },
+      {
+        "id": "fb73512e75a64b46be34b15429922e2c",
+        "question": [
+          "Which rows were rejected and why?"
+        ],
+        "sql": [
+          "SELECT reason, count(*) AS rows, count(DISTINCT store_id) AS stores_affected FROM workspace.r5_drybuild2.silver_quarantine GROUP BY reason"
+        ]
+      },
+      {
+        "id": "fc40cfb5636c4fdf9a5e4ee77e1d86e9",
+        "question": [
+          "How fresh and complete is the data behind these numbers?"
+        ],
+        "sql": [
+          "SELECT bronze_rows, silver_rows, quarantined_rows, duplicates_removed_est, round(median_latency_min,1) AS median_latency_min, round(p95_latency_min,1) AS p95_latency_min, round(late_share,4) AS late_share, latest_event_ts FROM workspace.r5_drybuild2.gold_data_trust"
+        ]
+      },
+      {
+        "id": "fe63f4fd923e45ac8cccc1b6a7c7d583",
+        "question": [
+          "Which categories earn our margin, and how is each trending?"
+        ],
+        "sql": [
+          "SELECT category, round(sum(net_sales),0) AS net_sales, round(sum(margin),0) AS margin, round(sum(margin)/sum(net_sales),3) AS margin_rate FROM workspace.r5_drybuild2.gold_daily_store_category GROUP BY category ORDER BY margin DESC"
+        ]
+      }
+    ],
+    "text_instructions": [
+      {
+        "id": "1088334603f6428fa12e0da4b4f696f9",
+        "content": [
+          "## PURPOSE",
+          "- Answer business questions about Birchwood Retail Group's margin, promotions, stock-outs, loyalty retention, basket affinity and data trust, for a retail leadership working session.",
+          "- Users are a Chief Data Officer, a VP of Engineering, and a COO - assume business fluency, not necessarily SQL fluency.",
+          "",
+          "## DISAMBIGUATION",
+          "- Currency is CAD.",
+          "- 'Margin' or 'net margin' means sales after discounts, less returns, less cost of goods sold - never subtract discount a second time.",
+          "- 'Margin rate' means net margin divided by sales after returns. On this data it is 30.83%. A different denominator (net margin over gross_net_sales in gold_margin_leakage) gives 28.95% - if asked, call that 'the same dollars, a different denominator', never a second headline rate.",
+          "- 'Net sales' already reflects discounts and returns.",
+          "- A promotion is 'margin dilutive' when its margin per day during the promotion is below the 28 days before it started (see gold_promo_effectiveness.verdict).",
+          "- Default groupings are month and category unless the user asks for a different grain.",
+          "",
+          "## DATA QUALITY NOTES",
+          "- gold_stockout_exposure.est_lost_margin and est_lost_units are ESTIMATES (expected weekly units x days out x unit margin). Sales are not generated to dip during a stock-out in this synthetic sample - always say 'estimate', never 'measured' or 'lost'.",
+          "- A promotion's 'margin change per day' (gold_promo_effectiveness.margin_change_per_day) compares actual margin to a modeled 28-day-prior baseline - call this comparison an ESTIMATE too.",
+          "- gold_data_trust and silver_quarantine describe pipeline freshness and data quality (latency, late share, duplicates, quarantined rows) - use these for any question about whether the data can be trusted.",
+          "- Do NOT label figures from gold_daily_store_category (net_sales, margin, margin_rate), gold_margin_leakage (returns_value, discount_given, net_margin, return_rate, discount_rate), gold_loyalty_cohorts, or gold_basket_affinity as ESTIMATE - these are measured sums from the pipeline, not modeled estimates. Only gold_stockout_exposure figures and promotion-vs-baseline comparisons are ESTIMATES.",
+          "",
+          "## CONSTRAINTS",
+          "- Never expose customer email or phone - these columns are not in any attached table, so do not attempt to join to tables that would expose them.",
+          "- All data is synthetic, generated with a fixed seed. Say so if asked whether this is real customer data.",
+          "",
+          "## Instructions you must follow when providing summaries",
+          "- Round percentages to two decimal places.",
+          "- Label every stock-out or promotion dollar figure as an ESTIMATE when it comes from gold_stockout_exposure or involves a 'margin dilutive' baseline comparison in gold_promo_effectiveness.",
+          "- State the margin rate as 30.83% using the fixed definition above unless the user explicitly asks for the other denominator."
+        ]
+      }
+    ]
+  }
+}

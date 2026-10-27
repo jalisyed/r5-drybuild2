@@ -1,0 +1,81 @@
+{
+  "datasets": [
+    {
+      "name": "ds_canary",
+      "displayName": "Margin by category (canary)",
+      "queryLines": [
+        "SELECT category, net_sales, margin ",
+        "FROM gold_daily_store_category"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "canary_page",
+      "displayName": "Canary",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layoutVersion": "GRID_V1",
+      "layout": [
+        {
+          "widget": {
+            "name": "kpi-total-margin",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_canary",
+                  "fields": [
+                    {"name": "sum(margin)", "expression": "SUM(`margin`)"}
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(margin)",
+                  "displayName": "Total Net Margin",
+                  "format": {"type": "number-currency", "decimalPlaces": {"type": "max", "places": 0}}
+                }
+              },
+              "frame": {"title": "Total Net Margin", "showTitle": true}
+            }
+          },
+          "position": {"x": 0, "y": 0, "width": 4, "height": 3}
+        },
+        {
+          "widget": {
+            "name": "bar-margin-by-category",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_canary",
+                  "fields": [
+                    {"name": "category", "expression": "`category`"},
+                    {"name": "sum(margin)", "expression": "SUM(`margin`)"}
+                  ],
+                  "disaggregated": false,
+                  "orders": [{"direction": "DESC", "expression": "SUM(`margin`)"}]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {"fieldName": "category", "scale": {"type": "categorical"}},
+                "y": {"fieldName": "sum(margin)", "scale": {"type": "quantitative"}}
+              },
+              "frame": {"title": "Margin by category", "showTitle": true}
+            }
+          },
+          "position": {"x": 4, "y": 0, "width": 8, "height": 5}
+        }
+      ]
+    }
+  ]
+}
